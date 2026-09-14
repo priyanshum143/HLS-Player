@@ -30,17 +30,18 @@ class RenderPackets:
         """
 
         pygame.init()
-        self.screen = pygame.display.set_mode((width, height))
+        self._screen = pygame.display.set_mode((width, height))
         pygame.display.set_caption("HLS Player")
 
         # sync clock anchored to HW audio output, not wall time
-        self.audio_stream: sounddevice.OutputStream | None = None
-        self.sync_lock = threading.Lock()
-        self.pts_base: float = 0.0
-        self.stream_time_base: float = 0.0
+        self._audio_stream: sounddevice.OutputStream | None = None
+        self._sync_lock = threading.Lock()
+        self._pts_base: float = 0.0
+        self._stream_time_base: float = 0.0
 
-        self.stream_started_event = threading.Event()
-        self.stop_event = threading.Event()
+        # Stream start and end events
+        self._stream_started_event = threading.Event()
+        self._stop_event = threading.Event()
 
     def _display_at(self, video_pts: float) -> float:
         """
@@ -51,10 +52,10 @@ class RenderPackets:
         :return: wall-clock time (time.time() scale) at which to display the frame
         """
 
-        with self.sync_lock:
-            audio_stream = self.audio_stream
-            pts_base = self.pts_base
-            stream_time_base = self.stream_time_base
+        with self._sync_lock:
+            audio_stream = self._audio_stream
+            pts_base = self._pts_base
+            stream_time_base = self._stream_time_base
 
         if audio_stream is None:
             return time.time()
@@ -63,7 +64,7 @@ class RenderPackets:
         current_audio_pts = pts_base + elapsed
         return time.time() + (video_pts - current_audio_pts)
 
-    def audio_loop(self, audio_queue: queue.Queue) -> None:
+    def _audio_loop(self, audio_queue: queue.Queue) -> None:
         """
         This method consumes AudioPackets, feeds PCM to a single continuous OutputStream,
         and maintains the A/V sync clock anchored to the hardware audio clock.
@@ -81,7 +82,7 @@ class RenderPackets:
                 if stream is not None:
                     stream.stop()
                     stream.close()
-                self.stream_started_event.set()
+                self._stream_started_event.set()
                 logger.debug("Audio render loop finished.")
                 return
 
@@ -98,12 +99,12 @@ class RenderPackets:
                 )
                 stream.start()
 
-                with self.sync_lock:
-                    self.audio_stream = stream
-                    self.pts_base = audio_packet.pts
-                    self.stream_time_base = stream.time + stream.latency
+                with self._sync_lock:
+                    self._audio_stream = stream
+                    self._pts_base = audio_packet.pts
+                    self._stream_time_base = stream.time + stream.latency
 
-                self.stream_started_event.set()
+                self._stream_started_event.set()
                 logger.debug(
                     f"Audio stream started: first_pts={audio_packet.pts:.3f}, "
                     f"latency={stream.latency:.3f}s"
@@ -111,16 +112,16 @@ class RenderPackets:
 
             # content timeline jumped — re-anchor sync clock to new PTS
             if audio_packet.discontinuity:
-                with self.sync_lock:
-                    self.stream_time_base = stream.time + stream.latency
-                    self.pts_base = audio_packet.pts
+                with self._sync_lock:
+                    self._stream_time_base = stream.time + stream.latency
+                    self._pts_base = audio_packet.pts
                     logger.debug(
                         f"Audio sync reset on discontinuity: "
                         f"pts={audio_packet.pts:.3f}, stream.time={stream.time:.3f}"
                     )
 
             # Stopping the audio stream
-            if self.stop_event.is_set():
+            if self._stop_event.is_set():
                 stream.stop()
                 stream.close()
                 return
@@ -128,7 +129,7 @@ class RenderPackets:
             # Writing to the stream
             stream.write(pcm)
 
-    def video_loop(self, video_queue: queue.Queue) -> None:
+    def _video_loop(self, video_queue: queue.Queue) -> None:
         """
         This method consumes VideoPackets, syncs each frame to the hardware audio clock,
         and blits it to the pygame window.
@@ -140,7 +141,7 @@ class RenderPackets:
         logger.debug("Video render loop started.")
 
         # Wait until the audio stream is running before starting sync
-        self.stream_started_event.wait()
+        self._stream_started_event.wait()
 
         while True:
             video_packet: VideoPacket | None = video_queue.get()
@@ -150,10 +151,10 @@ class RenderPackets:
 
             # content timeline jumped — re-anchor sync clock before display calc
             if video_packet.discontinuity:
-                with self.sync_lock:
-                    self.pts_base = video_packet.pts
-                    if self.audio_stream is not None:
-                        self.stream_time_base = self.audio_stream.time
+                with self._sync_lock:
+                    self._pts_base = video_packet.pts
+                    if self._audio_stream is not None:
+                        self._stream_time_base = self._audio_stream.time
                     logger.debug(f"Video sync reset on discontinuity: pts={video_packet.pts:.3f}")
 
             display_at = self._display_at(video_packet.pts)
@@ -168,7 +169,7 @@ class RenderPackets:
                 logger.debug(f"Dropping late frame at pts={video_packet.pts:.3f}, behind by {now - display_at:.3f}s")
                 continue
 
-            if self.stop_event.is_set():
+            if self._stop_event.is_set():
                 return
 
             # pygame surfarray expects (width, height, 3), numpy gives (height, width, 3)
@@ -189,8 +190,8 @@ class RenderPackets:
         :return: None
         """
 
-        audio_thread = threading.Thread(target=self.audio_loop, args=(audio_queue,), daemon=True)
-        video_thread = threading.Thread(target=self.video_loop, args=(video_queue,), daemon=True)
+        audio_thread = threading.Thread(target=self._audio_loop, args=(audio_queue,), daemon=True)
+        video_thread = threading.Thread(target=self._video_loop, args=(video_queue,), daemon=True)
 
         audio_thread.start()
         video_thread.start()
@@ -200,7 +201,7 @@ class RenderPackets:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     logger.info("User closed the window.")
-                    self.stop_event.set()
+                    self._stop_event.set()
                     pygame.quit()
                     return
             pygame.time.wait(10)

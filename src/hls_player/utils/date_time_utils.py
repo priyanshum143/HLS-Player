@@ -18,7 +18,7 @@ def convert_float_timestamp_to_IST(ts: float) -> str:
     return datetime.fromtimestamp(ts, tz=_IST).strftime('%Y-%m-%d %H:%M:%S IST')
 
 
-def convert_datetime_to_timezone(dt: datetime, tz: str) -> str | None:
+def convert_datetime_to_timezone(dt: datetime | None, tz: str) -> str | None:
     """
     Converts a datetime object to the given timezone.
 

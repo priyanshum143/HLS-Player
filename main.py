@@ -39,8 +39,8 @@ def main():
 
     # Resolving the media playlist URL and parsing resolution from rendition
     if renditions:
-        lowest_rendition = renditions[0]
-        complete_media_playlist_url = resolve_url(master_playlist_url, lowest_rendition.uri)
+        targeted_rendition = renditions[Configs.TARGETED_RENDITION]
+        complete_media_playlist_url = resolve_url(master_playlist_url, targeted_rendition.uri)
     else:
         logger.warning(f"No renditions found for {master_playlist_url}")
         sys.exit(1)

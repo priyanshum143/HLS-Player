@@ -14,3 +14,4 @@ class Configs:
     DISPLAY_WIDTH = 1280
     DISPLAY_HEIGHT = 720
     TIMEZONE = "Asia/Kolkata"
+    TARGETED_RENDITION = 0      # 0 being the lowest

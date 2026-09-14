@@ -33,7 +33,7 @@ class DecodeBytes:
         self.video_queue = queue.Queue()
 
     @staticmethod
-    def get_container_for_the_byte(downloaded_segment: DownloadedSegment) -> av.container.InputContainer:
+    def _get_container_for_the_byte(downloaded_segment: DownloadedSegment) -> av.container.InputContainer:
         """
         This method will return the container of a byte
 
@@ -43,7 +43,7 @@ class DecodeBytes:
 
         return av.open(io.BytesIO(downloaded_segment.data), mode='r')
 
-    def generate_audio_and_video_packet_from_a_frame(self, frame: Any, discontinuity: bool = False) -> None:
+    def _generate_audio_and_video_packet_from_a_frame(self, frame: Any, discontinuity: bool = False) -> None:
         """
         This method will segregate the Audio and Video Packet from a decoded frame
         and will generate Models.VideoPacket and Models.AudioPacket and push them
@@ -102,7 +102,7 @@ class DecodeBytes:
 
             seg_container = None
             try:
-                seg_container = self.get_container_for_the_byte(downloaded_seg)
+                seg_container = self._get_container_for_the_byte(downloaded_seg)
                 first_audio_emitted = False
                 first_video_emitted = False
                 for packet in seg_container.demux():
@@ -117,7 +117,7 @@ class DecodeBytes:
                             first_audio_emitted = True
                         else:
                             disc = False
-                        self.generate_audio_and_video_packet_from_a_frame(frame, discontinuity=disc)
+                        self._generate_audio_and_video_packet_from_a_frame(frame, discontinuity=disc)
             except av.FFmpegError as e:
                 logger.error(f"Failed to decode segment {downloaded_seg.sequence}: {e}, skipping.")
             finally:

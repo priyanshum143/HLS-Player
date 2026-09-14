@@ -30,11 +30,11 @@ class TsSegmentsFetcher:
         :param media_playlist_url: url of the media playlist
         """
 
-        self.media_playlist_url = media_playlist_url
+        self._media_playlist_url = media_playlist_url
         self.downloaded_segment_que = queue.Queue()
-        self.request_client = requests.Session()
+        self._request_client = requests.Session()
 
-    def download_segments(self, segment: Segment) -> bytes:
+    def _download_segments(self, segment: Segment) -> bytes:
         """
         This method is to download the ts segment and then return it as bytes
 
@@ -44,17 +44,17 @@ class TsSegmentsFetcher:
 
         # Resolving the absolute TS segment path
         segment_uri = segment.uri
-        ts_segment_uri = resolve_url(self.media_playlist_url, segment_uri)
+        ts_segment_uri = resolve_url(self._media_playlist_url, segment_uri)
 
         logger.debug(
             f"Downloading segment with media seq number [{segment.sequence}] "
             f"and URL [{ts_segment_uri}]"
         )
-        ts_seg = self.request_client.get(ts_segment_uri, timeout=5)
+        ts_seg = self._request_client.get(ts_segment_uri, timeout=5)
         ts_seg.raise_for_status()
         return ts_seg.content
 
-    def generate_downloaded_segment(self, segment: Segment) -> DownloadedSegment | None:
+    def _generate_downloaded_segment(self, segment: Segment) -> DownloadedSegment | None:
         """
         This method is to download the ts segments and then to return the DownloadedSegment object
 
@@ -63,7 +63,7 @@ class TsSegmentsFetcher:
         """
 
         try:
-            downloaded_seg = self.download_segments(segment)
+            downloaded_seg = self._download_segments(segment)
             return DownloadedSegment(
                 sequence=segment.sequence,
                 data=downloaded_seg,
@@ -97,7 +97,7 @@ class TsSegmentsFetcher:
                     break
 
                 logger.debug(f"Submitting segment [{segment.sequence}] for download.")
-                pending.append(executor.submit(self.generate_downloaded_segment, segment))
+                pending.append(executor.submit(self._generate_downloaded_segment, segment))
 
                 # Once the window is full, drain the oldest future to free a slot
                 while len(pending) >= max_parallel_downloads:

@@ -32,11 +32,11 @@ class PlaylistParser:
         :param master_playlist_url: master playlist url
         """
 
-        self.master_playlist_url = master_playlist_url
+        self._master_playlist_url = master_playlist_url
         self.seg_que = queue.Queue()
 
     @staticmethod
-    def check_if_media_playlist_is_valid(curr: m3u8.M3U8 | None, prev: m3u8.M3U8 | None) -> None:
+    def _check_if_media_playlist_is_valid(curr: m3u8.M3U8 | None, prev: m3u8.M3U8 | None) -> None:
         """
         This method is used to check if there is any msn jump
 
@@ -79,7 +79,7 @@ class PlaylistParser:
             )
 
     @staticmethod
-    def fetch_m3u8_playlist(m3u8_url: str) -> m3u8.M3U8:
+    def _fetch_m3u8_playlist(m3u8_url: str) -> m3u8.M3U8:
         """
         This method will load the m3u8 URL as m3u8 playlist and will return the same
         with error handling.
@@ -117,7 +117,7 @@ class PlaylistParser:
         for attempt in range(1, max_retries + 1):
             logger.debug(f"Attempt {attempt}/{max_retries} to fetch m3u8: {m3u8_url}")
             try:
-                return self.fetch_m3u8_playlist(m3u8_url)
+                return self._fetch_m3u8_playlist(m3u8_url)
             except urllib.error.HTTPError as e:
                 if e.code in (401, 403, 404):
                     logger.error(f"Non-retryable HTTP {e.code} for {m3u8_url}, aborting.")
@@ -138,7 +138,7 @@ class PlaylistParser:
         :return: List of renditions sorted by bandwidth
         """
 
-        master_playlist = self._fetch_m3u8_with_retry(self.master_playlist_url)
+        master_playlist = self._fetch_m3u8_with_retry(self._master_playlist_url)
         renditions = []
         for rendition in master_playlist.playlists:
             renditions.append(
@@ -177,7 +177,7 @@ class PlaylistParser:
 
             logger.debug("Fetching the media playlist.")
             media_playlist = self._fetch_m3u8_with_retry(m3u8_url)
-            PlaylistParser.check_if_media_playlist_is_valid(media_playlist, prev_media_playlist)
+            PlaylistParser._check_if_media_playlist_is_valid(media_playlist, prev_media_playlist)
             fetch_time = convert_float_timestamp_to_IST(time.time())
             msn_logs.debug(f"# Fetched at: {fetch_time}\n{media_playlist.dumps()}\n")
 
@@ -209,9 +209,9 @@ class PlaylistParser:
                     logger.debug(f"Found a new segment [{seq}], Adding to the queue.")
                     last_sequence = seq
                     segment = Segment(
-                        uri=seg.uri,
+                        uri=seg.uri or "",
                         sequence=seq,
-                        duration=seg.duration,
+                        duration=seg.duration or 0,
                         discontinuity=seg.discontinuity,
                         program_date_time=convert_datetime_to_timezone(
                             seg.program_date_time, Configs.TIMEZONE
