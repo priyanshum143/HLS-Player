@@ -3,6 +3,7 @@ This class contains all the models / dataclasses required for HLS player
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass
@@ -20,3 +21,10 @@ class Segment:
     discontinuity: bool
     sequence: int
     program_date_time: datetime | None
+
+
+@dataclass
+class DownloadedSegment:
+    sequence: int
+    data: bytes
+    discontinuity: bool
