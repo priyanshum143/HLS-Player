@@ -98,6 +98,7 @@ class DecodeBytes:
                 self.audio_queue.put(None)
                 logger.debug("All the downloaded segments has been decoded.")
                 return
+            logger.debug(f"Decoding segment [{downloaded_seg.sequence}]")
 
             seg_container = None
             try:
