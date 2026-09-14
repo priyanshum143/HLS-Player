@@ -51,7 +51,7 @@ def main():
     )
 
     # Starting the thread to fetch the media playlist
-    logger.debug(f"Starting to fetch the media playlist for variant: {complete_media_playlist_url}")
+    logger.info(f"Starting to fetch the media playlist for variant: {complete_media_playlist_url}")
     playlist_thread.start()
 
     # Starting the threads to download the TS segments present in media playlist
