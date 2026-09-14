@@ -67,20 +67,20 @@ def main():
     )
 
     # Starting the thread to fetch the media playlist
-    logger.info(f"Starting to fetch the media playlist for variant: {complete_media_playlist_url}")
+    logger.debug(f"Starting to fetch the media playlist for variant: {complete_media_playlist_url}")
     playlist_thread.start()
 
     # Starting the thread to download the TS segments present in media playlist
-    logger.info("Starting to download the TS segments.")
+    logger.debug("Starting to download the TS segments.")
     ts_segment_thread.start()
 
     # Starting the thread to decode the downloaded TS segments Bytes
-    logger.info("Starting to decode the TS segment bytes.")
+    logger.debug("Starting to decode the TS segment bytes.")
     decode_bytes_thread.start()
 
     # Render blocks the main thread (pygame event loop) until playback finishes
     # or the user closes the window
-    logger.info("Starting renderer.")
+    logger.debug("Starting renderer.")
     renderer.render(decode_bytes.video_queue, decode_bytes.audio_queue)
 
     # Wait for pipeline threads to finish after rendering is done

@@ -85,7 +85,7 @@ class TsSegmentsFetcher:
         """
 
         max_parallel_downloads = Configs.MAX_PARALLEL_DOWNLOADS
-        logger.info(f"Starting parallel segment downloads with window size [{max_parallel_downloads}].")
+        logger.debug(f"Starting parallel segment downloads with window size [{max_parallel_downloads}].")
 
         with ThreadPoolExecutor(max_workers=max_parallel_downloads) as executor:
             pending = collections.deque()
@@ -93,7 +93,7 @@ class TsSegmentsFetcher:
             while True:
                 segment = segment_que.get()
                 if segment is None:
-                    logger.info("Received end-of-playlist signal. Draining remaining in-flight downloads.")
+                    logger.debug("Received end-of-playlist signal. Draining remaining in-flight downloads.")
                     break
 
                 logger.debug(f"Submitting segment [{segment.sequence}] for download.")
@@ -119,4 +119,4 @@ class TsSegmentsFetcher:
                     logger.warning("A segment was skipped (download returned None).")
 
         self.downloaded_segment_que.put(None)
-        logger.info("All segments have been downloaded and pushed to the queue.")
+        logger.debug("All segments have been downloaded and pushed to the queue.")
