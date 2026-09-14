@@ -43,13 +43,14 @@ class DecodeBytes:
 
         return av.open(io.BytesIO(downloaded_segment.data))
 
-    def generate_audio_and_video_packet_from_a_frame(self, frame: Any) -> None:
+    def generate_audio_and_video_packet_from_a_frame(self, frame: Any, discontinuity: bool = False) -> None:
         """
         This method will segregate the Audio and Video Packet from a decoded frame
         and will generate Models.VideoPacket and Models.AudioPacket and push them
         into their respective queues.
 
         :param frame: av.VideoFrame or av.AudioFrame
+        :param discontinuity: True only for the first audio/video frame of a discontinuous segment
         :return: None
         """
 
@@ -59,20 +60,25 @@ class DecodeBytes:
             video_packet = VideoPacket(
                 rgb_array=rgb_array,
                 pts=pts,
+                discontinuity=discontinuity,
             )
             self.video_queue.put(video_packet)
-
 
         elif isinstance(frame, av.AudioFrame):
             pcm = frame.to_ndarray()
             if pcm.dtype != np.float32:
-                max_val = float(np.iinfo(pcm.dtype).max) if np.issubdtype(pcm.dtype, np.integer) else 1.0
+                if np.issubdtype(pcm.dtype, np.integer):
+                    max_val = float(np.iinfo(pcm.dtype).max)
+                else:
+                    peak = np.abs(pcm).max()
+                    max_val = float(peak) if peak > 1.0 else 1.0
                 pcm = pcm.astype(np.float32) / max_val
             pts = float(frame.pts * frame.time_base)
             audio_packet = AudioPacket(
                 pcm=pcm,
                 pts=pts,
                 sample_rate=frame.sample_rate,
+                discontinuity=discontinuity,
             )
             self.audio_queue.put(audio_packet)
 
@@ -96,11 +102,21 @@ class DecodeBytes:
             seg_container = None
             try:
                 seg_container = self.get_container_for_the_byte(downloaded_seg)
+                first_audio_emitted = False
+                first_video_emitted = False
                 for packet in seg_container.demux():
-                    if packet.pts is None:
-                        continue
                     for frame in packet.decode():
-                        self.generate_audio_and_video_packet_from_a_frame(frame)
+                        if frame.pts is None:
+                            continue
+                        if isinstance(frame, av.VideoFrame):
+                            disc = downloaded_seg.discontinuity and not first_video_emitted
+                            first_video_emitted = True
+                        elif isinstance(frame, av.AudioFrame):
+                            disc = downloaded_seg.discontinuity and not first_audio_emitted
+                            first_audio_emitted = True
+                        else:
+                            disc = False
+                        self.generate_audio_and_video_packet_from_a_frame(frame, discontinuity=disc)
             except av.FFmpegError as e:
                 logger.error(f"Failed to decode segment {downloaded_seg.sequence}: {e}, skipping.")
             finally:

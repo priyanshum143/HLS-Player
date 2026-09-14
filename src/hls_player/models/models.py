@@ -33,9 +33,11 @@ class DownloadedSegment:
 class VideoPacket:
     rgb_array: np.ndarray
     pts: float
+    discontinuity: bool = False
 
 @dataclass
 class AudioPacket:
     pcm: np.ndarray
     pts: float
     sample_rate: int
+    discontinuity: bool = False
