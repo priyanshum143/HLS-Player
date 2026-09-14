@@ -1,6 +1,7 @@
 """
 This is the main file to run the HLS player
 """
+
 import sys
 import threading
 
@@ -46,7 +47,7 @@ def main():
 
     # Creating objects for fetcher and renderer
     ts_segment_fetcher = TsSegmentsFetcher(complete_media_playlist_url)
-    # renderer = RenderPackets(Configs.DISPLAY_WIDTH, Configs.DISPLAY_HEIGHT)
+    renderer = RenderPackets(Configs.DISPLAY_WIDTH, Configs.DISPLAY_HEIGHT)
 
     # Creating a thread to parse media playlist
     playlist_thread = threading.Thread(
@@ -80,8 +81,8 @@ def main():
 
     # Render blocks the main thread (pygame event loop) until playback finishes
     # or the user closes the window
-    # logger.debug("Starting renderer.")
-    # renderer.render(decode_bytes.video_queue, decode_bytes.audio_queue)
+    logger.debug("Starting the renderer.")
+    renderer.render(decode_bytes.video_queue, decode_bytes.audio_queue)
 
     # Wait for pipeline threads to finish after rendering is done
     playlist_thread.join()

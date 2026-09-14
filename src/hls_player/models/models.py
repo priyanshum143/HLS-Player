@@ -5,6 +5,7 @@ This class contains all the models / dataclasses required for HLS player
 import numpy as np
 from dataclasses import dataclass
 
+
 @dataclass
 class Rendition:
     uri: str
@@ -34,6 +35,7 @@ class VideoPacket:
     rgb_array: np.ndarray
     pts: float
     discontinuity: bool = False
+
 
 @dataclass
 class AudioPacket:

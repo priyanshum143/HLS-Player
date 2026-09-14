@@ -45,9 +45,9 @@ class PlaylistParser:
         :return: None
         """
 
-        prev_media_sequence = getattr(prev, 'media_sequence', None)
-        curr_media_sequence = getattr(curr, 'media_sequence', None)
-        if prev_media_sequence is None or curr_media_sequence is None:
+        prev_media_sequence: int | None = getattr(prev, 'media_sequence', None)
+        curr_media_sequence: int | None = getattr(curr, 'media_sequence', None)
+        if prev is None or curr is None or prev_media_sequence is None or curr_media_sequence is None:
             msn_skip_logger.info("Skipping the check, as one of the playlist is None.")
             return
 
@@ -143,10 +143,10 @@ class PlaylistParser:
         for rendition in master_playlist.playlists:
             renditions.append(
                 Rendition(
-                    uri=rendition.uri,
-                    bandwidth=rendition.stream_info.bandwidth,
+                    uri=rendition.uri or "",
+                    bandwidth=rendition.stream_info.bandwidth or 0,
                     resolution=f"{rendition.stream_info.resolution[0]}x{rendition.stream_info.resolution[1]}" if rendition.stream_info.resolution else "1280x720",
-                    codecs=rendition.stream_info.codecs,
+                    codecs=rendition.stream_info.codecs or "",
                 )
             )
         return sorted(renditions, key=lambda r: r.bandwidth)
@@ -186,9 +186,21 @@ class PlaylistParser:
             logger.debug(f"Base sequence of the media playlist: {base_sequence}")
 
             if is_first_fetch:
-                total = len(media_playlist.segments)
-                last_sequence = base_sequence + max(0, total - 2) - 1
-                logger.debug(f"First fetch: skipping to last 2 segments, starting from seq {last_sequence + 1}.")
+                logger.debug("Fetched the media playlist for the first time.")
+
+                logger.debug("Checking if there is any [#EXT-X-ENDLIST] tag in the media playlist.")
+                is_endlist = getattr(media_playlist, 'is_endlist', False)
+
+                if not is_endlist:
+                    total = len(media_playlist.segments)
+                    last_sequence = base_sequence + max(0, total - 2) - 1
+                    logger.debug(
+                        f"No [#EXT-X-ENDLIST] tag in first fetch:"
+                        f" skipping to last 2 segments, starting from seq {last_sequence + 1}."
+                    )
+                else:
+                    logger.debug(f"[#EXT-X-ENDLIST] tag is present, Playing the stream from [{base_sequence}] segment.")
+
                 is_first_fetch = False
 
             for idx, seg in enumerate(media_playlist.segments):

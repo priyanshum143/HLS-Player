@@ -41,7 +41,7 @@ class DecodeBytes:
         :return: container
         """
 
-        return av.open(io.BytesIO(downloaded_segment.data))
+        return av.open(io.BytesIO(downloaded_segment.data), mode='r')
 
     def generate_audio_and_video_packet_from_a_frame(self, frame: Any, discontinuity: bool = False) -> None:
         """
@@ -56,7 +56,7 @@ class DecodeBytes:
 
         if isinstance(frame, av.VideoFrame):
             rgb_array = frame.to_ndarray(format='rgb24')
-            pts = float(frame.pts * frame.time_base)
+            pts = frame.pts * float(frame.time_base)  # type: ignore[arg-type]
             video_packet = VideoPacket(
                 rgb_array=rgb_array,
                 pts=pts,
@@ -73,7 +73,7 @@ class DecodeBytes:
                     peak = np.abs(pcm).max()
                     max_val = float(peak) if peak > 1.0 else 1.0
                 pcm = pcm.astype(np.float32) / max_val
-            pts = float(frame.pts * frame.time_base)
+            pts = frame.pts * float(frame.time_base)  # type: ignore[arg-type]
             audio_packet = AudioPacket(
                 pcm=pcm,
                 pts=pts,

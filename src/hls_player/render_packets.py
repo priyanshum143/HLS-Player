@@ -33,15 +33,40 @@ class RenderPackets:
         self.screen = pygame.display.set_mode((width, height))
         pygame.display.set_caption("HLS Player")
 
-        self.stream_start: float | None = None
-        self.stream_start_lock = threading.Lock()
+        # sync clock anchored to HW audio output, not wall time
+        self.audio_stream: sounddevice.OutputStream | None = None
+        self.sync_lock = threading.Lock()
+        self.pts_base: float = 0.0
+        self.stream_time_base: float = 0.0
+
         self.stream_started_event = threading.Event()
         self.stop_event = threading.Event()
+
+    def _display_at(self, video_pts: float) -> float:
+        """
+        Return the wall-clock time at which a video frame at video_pts should be displayed,
+        derived from the hardware audio clock so video stays locked to actual audio output.
+
+        :param video_pts: presentation timestamp of the video frame in seconds
+        :return: wall-clock time (time.time() scale) at which to display the frame
+        """
+
+        with self.sync_lock:
+            audio_stream = self.audio_stream
+            pts_base = self.pts_base
+            stream_time_base = self.stream_time_base
+
+        if audio_stream is None:
+            return time.time()
+
+        elapsed = audio_stream.time - stream_time_base
+        current_audio_pts = pts_base + elapsed
+        return time.time() + (video_pts - current_audio_pts)
 
     def audio_loop(self, audio_queue: queue.Queue) -> None:
         """
         This method consumes AudioPackets, feeds PCM to a single continuous OutputStream,
-        and sets the master clock on the first packet.
+        and maintains the A/V sync clock anchored to the hardware audio clock.
 
         :param audio_queue: queue of audio packets
         :return: None
@@ -51,15 +76,12 @@ class RenderPackets:
         stream: sounddevice.OutputStream | None = None
 
         while True:
-            audio_packet: AudioPacket = audio_queue.get()
+            audio_packet: AudioPacket | None = audio_queue.get()
             if audio_packet is None:
                 if stream is not None:
                     stream.stop()
                     stream.close()
-                with self.stream_start_lock:
-                    if self.stream_start is None:
-                        self.stream_start = time.time()
-                        self.stream_started_event.set()
+                self.stream_started_event.set()
                 logger.debug("Audio render loop finished.")
                 return
 
@@ -67,8 +89,8 @@ class RenderPackets:
             pcm = np.ascontiguousarray(audio_packet.pcm.T, dtype=np.float32)
             channels = pcm.shape[1] if pcm.ndim > 1 else 1
 
-            # Open one OutputStream for the whole session — avoids gaps between frames
             if stream is None:
+                # Creating the stream object and starting the stream
                 stream = sounddevice.OutputStream(
                     samplerate=audio_packet.sample_rate,
                     channels=channels,
@@ -76,22 +98,39 @@ class RenderPackets:
                 )
                 stream.start()
 
-                with self.stream_start_lock:
-                    if self.stream_start is None:
-                        self.stream_start = time.time() - audio_packet.pts
-                        self.stream_started_event.set()
-                        logger.debug(f"Stream start set to {self.stream_start} from audio pts {audio_packet.pts}")
+                with self.sync_lock:
+                    self.audio_stream = stream
+                    self.pts_base = audio_packet.pts
+                    self.stream_time_base = stream.time + stream.latency
 
+                self.stream_started_event.set()
+                logger.debug(
+                    f"Audio stream started: first_pts={audio_packet.pts:.3f}, "
+                    f"latency={stream.latency:.3f}s"
+                )
+
+            # content timeline jumped — re-anchor sync clock to new PTS
+            if audio_packet.discontinuity:
+                with self.sync_lock:
+                    self.stream_time_base = stream.time + stream.latency
+                    self.pts_base = audio_packet.pts
+                    logger.debug(
+                        f"Audio sync reset on discontinuity: "
+                        f"pts={audio_packet.pts:.3f}, stream.time={stream.time:.3f}"
+                    )
+
+            # Stopping the audio stream
             if self.stop_event.is_set():
                 stream.stop()
                 stream.close()
                 return
 
+            # Writing to the stream
             stream.write(pcm)
 
     def video_loop(self, video_queue: queue.Queue) -> None:
         """
-        This method consumes VideoPackets, syncs each frame to the audio master clock,
+        This method consumes VideoPackets, syncs each frame to the hardware audio clock,
         and blits it to the pygame window.
 
         :param video_queue: queue of video packets
@@ -100,25 +139,32 @@ class RenderPackets:
 
         logger.debug("Video render loop started.")
 
-        # Wait until audio thread has set stream_start before attempting any sync
+        # Wait until the audio stream is running before starting sync
         self.stream_started_event.wait()
 
         while True:
-            video_packet: VideoPacket = video_queue.get()
+            video_packet: VideoPacket | None = video_queue.get()
             if video_packet is None:
                 logger.debug("Video render loop finished.")
                 return
 
-            with self.stream_start_lock:
-                stream_start = self.stream_start
+            # content timeline jumped — re-anchor sync clock before display calc
+            if video_packet.discontinuity:
+                with self.sync_lock:
+                    self.pts_base = video_packet.pts
+                    if self.audio_stream is not None:
+                        self.stream_time_base = self.audio_stream.time
+                    logger.debug(f"Video sync reset on discontinuity: pts={video_packet.pts:.3f}")
 
-            display_at = stream_start + video_packet.pts
+            display_at = self._display_at(video_packet.pts)
             now = time.time()
 
             if now < display_at:
+                if display_at - now > 30:
+                    logger.debug(f"Dropping stale pre-discontinuity frame at pts={video_packet.pts:.3f}")
+                    continue
                 time.sleep(display_at - now)
-            elif (now - display_at) > 0.1:
-                # Frame is more than 100ms late — drop it to catch up
+            elif now - display_at > 0.1:
                 logger.debug(f"Dropping late frame at pts={video_packet.pts:.3f}, behind by {now - display_at:.3f}s")
                 continue
 
@@ -128,6 +174,8 @@ class RenderPackets:
             # pygame surfarray expects (width, height, 3), numpy gives (height, width, 3)
             frame = np.transpose(video_packet.rgb_array, (1, 0, 2))
             surface = pygame.surfarray.make_surface(frame)
+            if surface.get_size() != self.screen.get_size():
+                surface = pygame.transform.scale(surface, self.screen.get_size())
             self.screen.blit(surface, (0, 0))
             pygame.display.flip()
 
@@ -157,7 +205,10 @@ class RenderPackets:
                     return
             pygame.time.wait(10)
 
+        # Joining the threads
         audio_thread.join()
         video_thread.join()
+
+        # Quiting PyGame
         pygame.quit()
         logger.info("Playback finished.")
