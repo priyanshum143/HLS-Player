@@ -61,10 +61,10 @@ def main():
     )
 
     # Creating a thread to decode the ts segment bytes
-    # decode_bytes_thread = threading.Thread(
-    #     target=decode_bytes.generate_audio_and_video_queue,
-    #     args=(ts_segment_fetcher.downloaded_segment_que,)
-    # )
+    decode_bytes_thread = threading.Thread(
+        target=decode_bytes.generate_audio_and_video_queue,
+        args=(ts_segment_fetcher.downloaded_segment_que,)
+    )
 
     # Starting the thread to fetch the media playlist
     logger.debug(f"Starting to fetch the media playlist for variant: {complete_media_playlist_url}")
@@ -75,8 +75,8 @@ def main():
     ts_segment_thread.start()
 
     # Starting the thread to decode the downloaded TS segments Bytes
-    # logger.debug("Starting to decode the TS segment bytes.")
-    # decode_bytes_thread.start()
+    logger.debug("Starting to decode the TS segment bytes.")
+    decode_bytes_thread.start()
 
     # Render blocks the main thread (pygame event loop) until playback finishes
     # or the user closes the window
@@ -86,7 +86,7 @@ def main():
     # Wait for pipeline threads to finish after rendering is done
     playlist_thread.join()
     ts_segment_thread.join()
-    # decode_bytes_thread.join()
+    decode_bytes_thread.join()
 
 if __name__ == "__main__":
     main()
