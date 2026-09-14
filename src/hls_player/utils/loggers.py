@@ -113,7 +113,7 @@ def get_msn_skip_logger():
 
     name = "msn_skip"
     logger = logging.getLogger(name)
-    logger.setLevel(logging.ERROR)
+    logger.setLevel(logging.INFO)
 
     if logger.handlers:
         return logger
@@ -127,7 +127,7 @@ def get_msn_skip_logger():
     )
 
     file_handler = logging.FileHandler(log_dir / "msn_skips.log", encoding="utf-8")
-    file_handler.setLevel(logging.ERROR)
+    file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
 
     logger.addHandler(file_handler)

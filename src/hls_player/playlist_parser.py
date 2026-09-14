@@ -13,7 +13,7 @@ from src.hls_player.models.models import (
     Rendition,
 )
 from src.hls_player.utils.loggers import get_logger, get_msn_logs_logger, get_msn_skip_logger
-from src.hls_player.utils.date_time_utils import convert_float_timestamp_to_IST
+from src.hls_player.utils.date_time_utils import convert_float_timestamp_to_IST, convert_datetime_to_timezone
 
 logger = get_logger(__name__)
 msn_skip_logger = get_msn_skip_logger()
@@ -34,6 +34,49 @@ class PlaylistParser:
 
         self.master_playlist_url = master_playlist_url
         self.seg_que = queue.Queue()
+
+    @staticmethod
+    def check_if_media_playlist_is_valid(curr: m3u8.M3U8 | None, prev: m3u8.M3U8 | None) -> None:
+        """
+        This method is used to check if there is any msn jump
+
+        :param curr: current playlist
+        :param prev: previous playlist
+        :return: None
+        """
+
+        prev_media_sequence = getattr(prev, 'media_sequence', None)
+        curr_media_sequence = getattr(curr, 'media_sequence', None)
+        if prev_media_sequence is None or curr_media_sequence is None:
+            msn_skip_logger.info("Skipping the check, as one of the playlist is None.")
+            return
+
+        prev_window_end = prev_media_sequence + len(prev.segments)
+        curr_window_end = curr_media_sequence + len(curr.segments)
+
+        if curr_media_sequence > prev_window_end:
+            skipped = curr_media_sequence - prev_window_end
+            msn_skip_logger.error(
+                f"MSN SKIP: prev_base={prev_media_sequence}, curr_base={curr_media_sequence}, "
+                f"prev_window_end={prev_window_end} | "
+                f"{skipped} segment(s) never seen in any playlist window "
+                f"(missing MSN {prev_window_end}..{curr_media_sequence - 1})"
+            )
+        elif curr_media_sequence < prev_media_sequence:
+            msn_skip_logger.error(
+                f"MSN REGRESSION: sequence went backwards "
+                f"prev_base={prev_media_sequence} -> curr_base={curr_media_sequence} "
+                f"(dropped by {prev_media_sequence - curr_media_sequence})"
+            )
+        else:
+            overlap = prev_window_end - curr_media_sequence
+            advanced = curr_media_sequence - prev_media_sequence
+            msn_skip_logger.info(
+                f"Playlist OK: advanced by {advanced} segment(s), "
+                f"{overlap} segment(s) overlap | "
+                f"prev=[{prev_media_sequence}..{prev_window_end - 1}] "
+                f"curr=[{curr_media_sequence}..{curr_window_end - 1}]"
+            )
 
     @staticmethod
     def fetch_m3u8_playlist(m3u8_url: str) -> m3u8.M3U8:
@@ -118,8 +161,10 @@ class PlaylistParser:
         """
 
         last_sequence = -1
+        is_first_fetch = True
+        prev_media_playlist = None
         start_time = time.time()
-        logger.info(f"Start time of pushing the segments in queue: {convert_float_timestamp_to_IST(start_time)}")
+        logger.debug(f"Start time of pushing the segments in queue: {convert_float_timestamp_to_IST(start_time)}")
 
         while True:
             if duration is not None and (time.time() - start_time) >= duration:
@@ -132,38 +177,42 @@ class PlaylistParser:
 
             logger.debug("Fetching the media playlist.")
             media_playlist = self._fetch_m3u8_with_retry(m3u8_url)
-            sleep_time = getattr(media_playlist, 'target_duration', 0) / 2
-
+            PlaylistParser.check_if_media_playlist_is_valid(media_playlist, prev_media_playlist)
             fetch_time = convert_float_timestamp_to_IST(time.time())
-            msn_logs.debug(f"# Fetched at: {fetch_time}\n{media_playlist.dumps()}\n\n")
+            msn_logs.debug(f"# Fetched at: {fetch_time}\n{media_playlist.dumps()}\n")
 
+            sleep_time = getattr(media_playlist, 'target_duration', 0) / 2
             base_sequence = getattr(media_playlist, 'media_sequence', 0)
             logger.debug(f"Base sequence of the media playlist: {base_sequence}")
+
+            if is_first_fetch:
+                total = len(media_playlist.segments)
+                last_sequence = base_sequence + max(0, total - 2) - 1
+                logger.debug(f"First fetch: skipping to last 2 segments, starting from seq {last_sequence + 1}.")
+                is_first_fetch = False
 
             for idx, seg in enumerate(media_playlist.segments):
                 seq = base_sequence + idx
                 if seq > last_sequence:
-                    if last_sequence != -1 and seq > last_sequence + 1:
-                        msn_skip_logger.error(
-                            f"MSN skip detected: expected {last_sequence + 1}, got {seq} "
-                            f"({seq - last_sequence - 1} segment(s) skipped)."
-                        )
                     logger.debug(f"Found a new segment [{seq}], Adding to the queue.")
                     last_sequence = seq
-                    self.seg_que.put(
-                        Segment(
-                            uri=seg.uri,
-                            sequence=seq,
-                            duration=seg.duration,
-                            discontinuity=seg.discontinuity,
-                            program_date_time=None
-                        )
+                    segment = Segment(
+                        uri=seg.uri,
+                        sequence=seq,
+                        duration=seg.duration,
+                        discontinuity=seg.discontinuity,
+                        program_date_time=convert_datetime_to_timezone(
+                            seg.program_date_time, Configs.TIMEZONE
+                        ),
                     )
+                    self.seg_que.put(segment)
+                    logger.debug(f"Added segment [{segment}] in the queue.")
 
             if getattr(media_playlist, 'is_endlist', False):
                 self.seg_que.put(None)
                 logger.info("Playlist has ended.")
                 break
 
+            prev_media_playlist = media_playlist
             logger.debug(f"Sleeping for {sleep_time} seconds before fetching the media playlist again.")
             time.sleep(sleep_time)

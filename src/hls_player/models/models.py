@@ -20,7 +20,7 @@ class Segment:
     duration: float
     discontinuity: bool
     sequence: int
-    program_date_time: datetime | None
+    program_date_time: str | None
 
 
 @dataclass
