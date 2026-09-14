@@ -8,5 +8,7 @@ dependencies = [
     "av>=18.0.0",
     "m3u8>=6.0.0",
     "numpy>=2.5.1",
+    "pygame>=2.6.1",
     "requests>=2.34.2",
+    "sounddevice>=0.5.5",
 ]

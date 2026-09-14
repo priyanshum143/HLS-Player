@@ -8,6 +8,7 @@ from src.hls_player import Configs
 from src.hls_player.playlist_parser import PlaylistParser
 from src.hls_player.ts_segment_fetcher import TsSegmentsFetcher
 from src.hls_player.decode_bytes import DecodeBytes
+from src.hls_player.render_packets import RenderPackets
 from src.hls_player.utils.string_utils import resolve_url
 from src.hls_player.utils.loggers import get_logger
 
@@ -33,12 +34,14 @@ def main():
     renditions = playlist_fetcher.fetch_and_parse_renditions_from_master_playlist()
     logger.debug(f"Renditions found: {renditions}")
 
-    # Resolving the media playlist URL
-    lowest_bandwidth_rendition_uri = renditions[0].uri
-    complete_media_playlist_url = resolve_url(master_playlist_url, lowest_bandwidth_rendition_uri)
+    # Resolving the media playlist URL and parsing resolution from rendition
+    lowest_rendition = renditions[0]
+    complete_media_playlist_url = resolve_url(master_playlist_url, lowest_rendition.uri)
+    width, height = map(int, lowest_rendition.resolution.split('x'))
 
-    # Creating an object of fetcher
+    # Creating objects for fetcher and renderer
     ts_segment_fetcher = TsSegmentsFetcher(complete_media_playlist_url)
+    renderer = RenderPackets(width, height)
 
     # Creating a thread to parse media playlist
     playlist_thread = threading.Thread(
@@ -70,16 +73,14 @@ def main():
     logger.info("Starting to decode the TS segment bytes.")
     decode_bytes_thread.start()
 
-    # Finishing the thread which was fetching the media playlist
-    try:
-        playlist_thread.join()
-    finally:
-        playlist_fetcher.seg_que.put(None)
+    # Render blocks the main thread (pygame event loop) until playback finishes
+    # or the user closes the window
+    logger.info("Starting renderer.")
+    renderer.render(decode_bytes.video_queue, decode_bytes.audio_queue)
 
-    # Finishing the thread which was downloading the TS segments
+    # Wait for pipeline threads to finish after rendering is done
+    playlist_thread.join()
     ts_segment_thread.join()
-
-    # Finishing the thread which was decoding the TS segments bytes.
     decode_bytes_thread.join()
 
 if __name__ == "__main__":

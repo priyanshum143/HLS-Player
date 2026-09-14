@@ -100,7 +100,7 @@ class PlaylistParser:
                 Rendition(
                     uri=rendition.uri,
                     bandwidth=rendition.stream_info.bandwidth,
-                    resolution=str(rendition.stream_info.resolution),
+                    resolution=f"{rendition.stream_info.resolution[0]}x{rendition.stream_info.resolution[1]}",
                     codecs=rendition.stream_info.codecs,
                 )
             )
