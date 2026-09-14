@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HLS Player</title>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0f0f0f;
+            color: #ffffff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            font-weight: 500;
+            margin-bottom: 24px;
+            color: #cccccc;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 20px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 10px 14px;
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        input[type="text"]:focus {
+            border-color: #555;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #333;
+        }
+
+        video {
+            width: 100%;
+            max-width: 800px;
+            border-radius: 8px;
+            background: #000;
+        }
+
+        #error {
+            margin-top: 12px;
+            color: #e05555;
+            font-size: 0.85rem;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>HLS Player</h1>
+
+    <div class="input-row">
+        <input type="text" id="url-input" placeholder="Paste your .m3u8 URL here" />
+        <button onclick="loadStream()">Play</button>
+    </div>
+
+    <video id="player" controls autoplay muted></video>
+    <div id="error"></div>
+
+    <script>
+        let hls = null;
+
+        function loadStream() {
+            const url = document.getElementById('url-input').value.trim();
+            const video = document.getElementById('player');
+            const errorDiv = document.getElementById('error');
+
+            errorDiv.style.display = 'none';
+
+            if (!url) return;
+
+            // Destroy any existing hls instance before starting a new one
+            if (hls) {
+                hls.destroy();
+                hls = null;
+            }
+
+            if (Hls.isSupported()) {
+                hls = new Hls();
+                hls.loadSource(url);
+                hls.attachMedia(video);
+
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        errorDiv.textContent = `Playback error: ${data.details}`;
+                        errorDiv.style.display = 'block';
+                    }
+                });
+            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+                // Safari has native HLS support
+                video.src = url;
+            } else {
+                errorDiv.textContent = 'HLS is not supported in this browser.';
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // Allow pressing Enter to trigger play
+        document.getElementById('url-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') loadStream();
+        });
+    </script>
+
+</body>
+</html>
