@@ -175,9 +175,9 @@ class RenderPackets:
             # pygame surfarray expects (width, height, 3), numpy gives (height, width, 3)
             frame = np.transpose(video_packet.rgb_array, (1, 0, 2))
             surface = pygame.surfarray.make_surface(frame)
-            if surface.get_size() != self.screen.get_size():
-                surface = pygame.transform.scale(surface, self.screen.get_size())
-            self.screen.blit(surface, (0, 0))
+            if surface.get_size() != self._screen.get_size():
+                surface = pygame.transform.scale(surface, self._screen.get_size())
+            self._screen.blit(surface, (0, 0))
             pygame.display.flip()
 
     def render(self, video_queue: queue.Queue, audio_queue: queue.Queue) -> None:
