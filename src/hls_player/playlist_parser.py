@@ -16,6 +16,7 @@ from src.hls_player.utils.loggers import get_logger
 from src.hls_player.utils.date_time_utils import convert_float_timestamp_to_IST
 
 logger = get_logger(__name__)
+msn_skip_logger = get_logger("msn_skip")
 
 
 class PlaylistParser:
@@ -138,6 +139,11 @@ class PlaylistParser:
             for idx, seg in enumerate(media_playlist.segments):
                 seq = base_sequence + idx
                 if seq > last_sequence:
+                    if last_sequence != -1 and seq > last_sequence + 1:
+                        msn_skip_logger.error(
+                            f"MSN skip detected: expected {last_sequence + 1}, got {seq} "
+                            f"({seq - last_sequence - 1} segment(s) skipped)."
+                        )
                     logger.debug(f"Found a new segment [{seq}], Adding to the queue.")
                     last_sequence = seq
                     self.seg_que.put(
