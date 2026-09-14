@@ -25,7 +25,7 @@ def setup_logger(name: str, log_file: str = None, level=logging.DEBUG):
 
     # Default log file with timestamp
     if log_file is None:
-        timestamp = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y%m%d")
         log_file = log_dir / f"hls_player_{timestamp}.log"
     else:
         log_file = log_dir / log_file
