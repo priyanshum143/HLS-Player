@@ -88,11 +88,16 @@ class DecodeBytes:
                 logger.info("All the downloaded segments has been decoded.")
                 return
 
-            seg_container = self.get_container_for_the_byte(downloaded_seg)
-            for packet in seg_container.demux():
-                if packet.pts is None:
-                    continue
-
-                for frame in packet.decode():
-                    self.generate_audio_and_video_packet_from_a_frame(frame)
-            seg_container.close()
+            seg_container = None
+            try:
+                seg_container = self.get_container_for_the_byte(downloaded_seg)
+                for packet in seg_container.demux():
+                    if packet.pts is None:
+                        continue
+                    for frame in packet.decode():
+                        self.generate_audio_and_video_packet_from_a_frame(frame)
+            except av.AVError as e:
+                logger.error(f"Failed to decode segment {downloaded_seg.sequence}: {e}, skipping.")
+            finally:
+                if seg_container:
+                    seg_container.close()

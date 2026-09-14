@@ -1,7 +1,7 @@
 """
 This is the main file to run the HLS player
 """
-
+import sys
 import threading
 
 from src.hls_player import Configs
@@ -35,9 +35,13 @@ def main():
     logger.debug(f"Renditions found: {renditions}")
 
     # Resolving the media playlist URL and parsing resolution from rendition
-    lowest_rendition = renditions[0]
-    complete_media_playlist_url = resolve_url(master_playlist_url, lowest_rendition.uri)
-    width, height = map(int, lowest_rendition.resolution.split('x'))
+    if renditions:
+        lowest_rendition = renditions[0]
+        complete_media_playlist_url = resolve_url(master_playlist_url, lowest_rendition.uri)
+        width, height = map(int, lowest_rendition.resolution.split('x'))
+    else:
+        logger.warning(f"No renditions found for {master_playlist_url}")
+        sys.exit(1)
 
     # Creating objects for fetcher and renderer
     ts_segment_fetcher = TsSegmentsFetcher(complete_media_playlist_url)

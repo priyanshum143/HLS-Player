@@ -51,6 +51,10 @@ class RenderPackets:
         while True:
             audio_packet: AudioPacket = audio_queue.get()
             if audio_packet is None:
+                with self.stream_start_lock:
+                    if self.stream_start is None:
+                        self.stream_start = time.time()
+                        self.stream_started_event.set()
                 logger.info("Audio render loop finished.")
                 return
 
@@ -137,6 +141,7 @@ class RenderPackets:
                     sounddevice.stop()
                     pygame.quit()
                     return
+            pygame.time.wait(10)
 
         audio_thread.join()
         video_thread.join()

@@ -4,7 +4,6 @@ This file contains the code to download the ts segments and to store them in a b
 
 import queue
 import requests
-import urllib.error
 
 from src.hls_player.utils.string_utils import resolve_url
 from src.hls_player.models.models import (
@@ -48,7 +47,7 @@ class TsSegmentsFetcher:
             f"Downloading segment with media seq number [{segment.sequence}] "
             f"and URL [{ts_segment_uri}]"
         )
-        ts_seg = self.request_client.get(ts_segment_uri)
+        ts_seg = self.request_client.get(ts_segment_uri, timeout=5)
         ts_seg.raise_for_status()
         return ts_seg.content
 
@@ -67,9 +66,9 @@ class TsSegmentsFetcher:
                 data=downloaded_seg,
                 discontinuity=segment.discontinuity,
             )
-        except urllib.error.HTTPError as e:
-            if e.code in (401, 403, 404):
-                logger.error(f"Non-retryable HTTP {e.code} for {segment}, Skipping the segment.")
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code in (401, 403, 404):
+                logger.error(f"Non-retryable HTTP {e.response.status_code} for {segment}, Skipping the segment.")
                 return None
 
     def push_downloaded_segment_in_que(self, segment_que: queue.Queue) -> None:

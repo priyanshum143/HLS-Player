@@ -79,7 +79,7 @@ class PlaylistParser:
                     raise
                 last_exception = e
                 logger.warning(f"HTTP {e.code} on attempt {attempt}/{max_retries}, retrying...")
-            except (urllib.error.URLError, Exception) as e:
+            except (urllib.error.URLError, OSError, ConnectionError) as e:
                 last_exception = e
                 logger.warning(f"Attempt {attempt}/{max_retries} failed: {e}, retrying...")
 
