@@ -3,8 +3,11 @@ This file contains the code to download the ts segments and to store them in a b
 """
 
 import queue
+import collections
 import requests
+from concurrent.futures import ThreadPoolExecutor
 
+from src.hls_player import Configs
 from src.hls_player.utils.string_utils import resolve_url
 from src.hls_player.models.models import (
     Segment,
@@ -74,24 +77,46 @@ class TsSegmentsFetcher:
     def push_downloaded_segment_in_que(self, segment_que: queue.Queue) -> None:
         """
         This method will keep downloading the ts segments present in PlaylistParser.seg_que
-        and will push the downloaded segment in the decoded_queue
+        and will push the downloaded segment in the decoded_queue. Downloads are done
+        concurrently using a thread pool while preserving segment order.
 
         :param segment_que: PlaylistParser.seg_que
         :return: None
         """
 
-        logger.info("Starting to pull segments from queue and download them.")
-        while True:
-            segment = segment_que.get()
-            if segment is None:
-                self.downloaded_segment_que.put(None)
-                logger.info("All the segments have been downloaded.")
-                break
-            logger.debug(f"Got the segment: {segment} from segments queue.")
+        max_parallel_downloads = Configs.MAX_PARALLEL_DOWNLOADS
+        logger.info(f"Starting parallel segment downloads with window size [{max_parallel_downloads}].")
 
-            downloaded_seg = self.generate_downloaded_segment(segment)
-            if not downloaded_seg:
-                continue
-            logger.debug(f"Made the downloaded segment: {downloaded_seg.sequence}")
+        with ThreadPoolExecutor(max_workers=max_parallel_downloads) as executor:
+            pending = collections.deque()
 
-            self.downloaded_segment_que.put(downloaded_seg)
+            while True:
+                segment = segment_que.get()
+                if segment is None:
+                    logger.info("Received end-of-playlist signal. Draining remaining in-flight downloads.")
+                    break
+
+                logger.debug(f"Submitting segment [{segment.sequence}] for download.")
+                pending.append(executor.submit(self.generate_downloaded_segment, segment))
+
+                # Once the window is full, drain the oldest future to free a slot
+                while len(pending) >= max_parallel_downloads:
+                    result = pending.popleft().result()
+                    if result:
+                        logger.debug(f"Download complete for segment [{result.sequence}], pushing to queue.")
+                        self.downloaded_segment_que.put(result)
+                    else:
+                        logger.warning("A segment was skipped (download returned None).")
+
+            # Drain all remaining in-flight downloads after end-of-playlist
+            logger.debug(f"Draining [{len(pending)}] remaining in-flight downloads.")
+            for future in pending:
+                result = future.result()
+                if result:
+                    logger.debug(f"Download complete for segment [{result.sequence}], pushing to queue.")
+                    self.downloaded_segment_que.put(result)
+                else:
+                    logger.warning("A segment was skipped (download returned None).")
+
+        self.downloaded_segment_que.put(None)
+        logger.info("All segments have been downloaded and pushed to the queue.")
