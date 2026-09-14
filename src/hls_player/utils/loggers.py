@@ -74,3 +74,62 @@ def get_logger(name: str):
     """
 
     return setup_logger(name)
+
+
+def get_msn_logs_logger():
+    """
+    Logger that captures raw media playlist fetches to logs/msn_logs.log.
+
+    :return logging.Logger: Logger instance
+    """
+
+    name = "msn_logs"
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+
+    if logger.handlers:
+        return logger
+
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+
+    formatter = logging.Formatter("%(message)s")
+
+    file_handler = logging.FileHandler(log_dir / "msn_logs.log", encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
+    logger.propagate = False
+    return logger
+
+
+def get_msn_skip_logger():
+    """
+    Logger that captures MSN skip errors to logs/msn_skips.log.
+
+    :return logging.Logger: Logger instance
+    """
+
+    name = "msn_skip"
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.ERROR)
+
+    if logger.handlers:
+        return logger
+
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(levelname)s - %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    file_handler = logging.FileHandler(log_dir / "msn_skips.log", encoding="utf-8")
+    file_handler.setLevel(logging.ERROR)
+    file_handler.setFormatter(formatter)
+
+    logger.addHandler(file_handler)
+    logger.propagate = False
+    return logger

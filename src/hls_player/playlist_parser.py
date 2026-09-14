@@ -12,12 +12,12 @@ from src.hls_player.models.models import (
     Segment,
     Rendition,
 )
-from src.hls_player.utils.loggers import get_logger
+from src.hls_player.utils.loggers import get_logger, get_msn_logs_logger, get_msn_skip_logger
 from src.hls_player.utils.date_time_utils import convert_float_timestamp_to_IST
 
 logger = get_logger(__name__)
-msn_skip_logger = get_logger("msn_skip")
-msn_logs = get_logger("msn_logs")
+msn_skip_logger = get_msn_skip_logger()
+msn_logs = get_msn_logs_logger()
 
 
 class PlaylistParser:
@@ -132,8 +132,10 @@ class PlaylistParser:
 
             logger.debug("Fetching the media playlist.")
             media_playlist = self._fetch_m3u8_with_retry(m3u8_url)
-            msn_logs.debug(media_playlist)
             sleep_time = getattr(media_playlist, 'target_duration', 0) / 2
+
+            fetch_time = convert_float_timestamp_to_IST(time.time())
+            msn_logs.debug(f"# Fetched at: {fetch_time}\n{media_playlist.dumps()}\n\n")
 
             base_sequence = getattr(media_playlist, 'media_sequence', 0)
             logger.debug(f"Base sequence of the media playlist: {base_sequence}")
