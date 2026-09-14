@@ -83,6 +83,8 @@ class DecodeBytes:
         while True:
             downloaded_seg = downloaded_seg_que.get()
             if downloaded_seg is None:
+                self.video_queue.put(None)
+                self.audio_queue.put(None)
                 logger.info("All the downloaded segments has been decoded.")
                 return
 
@@ -93,3 +95,4 @@ class DecodeBytes:
 
                 for frame in packet.decode():
                     self.generate_audio_and_video_packet_from_a_frame(frame)
+            seg_container.close()

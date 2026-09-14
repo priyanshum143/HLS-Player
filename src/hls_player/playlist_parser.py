@@ -143,7 +143,7 @@ class PlaylistParser:
                     self.seg_que.put(
                         Segment(
                             uri=seg.uri,
-                            sequence=seg.media_sequence,
+                            sequence=seq,
                             duration=seg.duration,
                             discontinuity=seg.discontinuity,
                             program_date_time=None

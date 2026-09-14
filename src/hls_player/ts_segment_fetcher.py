@@ -4,6 +4,7 @@ This file contains the code to download the ts segments and to store them in a b
 
 import queue
 import requests
+import urllib.error
 
 from src.hls_player.utils.string_utils import resolve_url
 from src.hls_player.models.models import (
@@ -48,9 +49,10 @@ class TsSegmentsFetcher:
             f"and URL [{ts_segment_uri}]"
         )
         ts_seg = self.request_client.get(ts_segment_uri)
+        ts_seg.raise_for_status()
         return ts_seg.content
 
-    def generate_downloaded_segment(self, segment: Segment) -> DownloadedSegment:
+    def generate_downloaded_segment(self, segment: Segment) -> DownloadedSegment | None:
         """
         This method is to download the ts segments and then to return the DownloadedSegment object
 
@@ -58,12 +60,17 @@ class TsSegmentsFetcher:
         :return: DownloadedSegment object
         """
 
-        downloaded_seg = self.download_segments(segment)
-        return DownloadedSegment(
-            sequence=segment.sequence,
-            data=downloaded_seg,
-            discontinuity=segment.discontinuity,
-        )
+        try:
+            downloaded_seg = self.download_segments(segment)
+            return DownloadedSegment(
+                sequence=segment.sequence,
+                data=downloaded_seg,
+                discontinuity=segment.discontinuity,
+            )
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403, 404):
+                logger.error(f"Non-retryable HTTP {e.code} for {segment}, Skipping the segment.")
+                return None
 
     def push_downloaded_segment_in_que(self, segment_que: queue.Queue) -> None:
         """
@@ -84,6 +91,8 @@ class TsSegmentsFetcher:
             logger.debug(f"Got the segment: {segment} from segments queue.")
 
             downloaded_seg = self.generate_downloaded_segment(segment)
+            if not downloaded_seg:
+                continue
             logger.debug(f"Made the downloaded segment: {downloaded_seg}")
 
             self.downloaded_segment_que.put(downloaded_seg)
