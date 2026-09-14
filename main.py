@@ -26,12 +26,13 @@ def main():
     :return: None
     """
 
+    logger.info(f"Starting to play [{master_playlist_url}]")
+
     # The duration for which we need to run our player
-    # duration = Configs.DEFAULT_PLAYER_DURATION
-    duration = None
+    duration = Configs.DEFAULT_PLAYER_DURATION
 
     # Fetching the renditions from master playlist
-    logger.info(f"Fetching the master playlist for {master_playlist_url} to extract the renditions.")
+    logger.debug(f"Fetching the master playlist for {master_playlist_url} to extract the renditions.")
     renditions = playlist_fetcher.fetch_and_parse_renditions_from_master_playlist()
     logger.debug(f"Renditions found: {renditions}")
 
@@ -39,14 +40,13 @@ def main():
     if renditions:
         lowest_rendition = renditions[0]
         complete_media_playlist_url = resolve_url(master_playlist_url, lowest_rendition.uri)
-        width, height = map(int, lowest_rendition.resolution.split('x'))
     else:
         logger.warning(f"No renditions found for {master_playlist_url}")
         sys.exit(1)
 
     # Creating objects for fetcher and renderer
     ts_segment_fetcher = TsSegmentsFetcher(complete_media_playlist_url)
-    renderer = RenderPackets(width, height)
+    # renderer = RenderPackets(Configs.DISPLAY_WIDTH, Configs.DISPLAY_HEIGHT)
 
     # Creating a thread to parse media playlist
     playlist_thread = threading.Thread(
@@ -61,10 +61,10 @@ def main():
     )
 
     # Creating a thread to decode the ts segment bytes
-    decode_bytes_thread = threading.Thread(
-        target=decode_bytes.generate_audio_and_video_queue,
-        args=(ts_segment_fetcher.downloaded_segment_que,)
-    )
+    # decode_bytes_thread = threading.Thread(
+    #     target=decode_bytes.generate_audio_and_video_queue,
+    #     args=(ts_segment_fetcher.downloaded_segment_que,)
+    # )
 
     # Starting the thread to fetch the media playlist
     logger.debug(f"Starting to fetch the media playlist for variant: {complete_media_playlist_url}")
@@ -75,18 +75,18 @@ def main():
     ts_segment_thread.start()
 
     # Starting the thread to decode the downloaded TS segments Bytes
-    logger.debug("Starting to decode the TS segment bytes.")
-    decode_bytes_thread.start()
+    # logger.debug("Starting to decode the TS segment bytes.")
+    # decode_bytes_thread.start()
 
     # Render blocks the main thread (pygame event loop) until playback finishes
     # or the user closes the window
-    logger.debug("Starting renderer.")
-    renderer.render(decode_bytes.video_queue, decode_bytes.audio_queue)
+    # logger.debug("Starting renderer.")
+    # renderer.render(decode_bytes.video_queue, decode_bytes.audio_queue)
 
     # Wait for pipeline threads to finish after rendering is done
     playlist_thread.join()
     ts_segment_thread.join()
-    decode_bytes_thread.join()
+    # decode_bytes_thread.join()
 
 if __name__ == "__main__":
     main()

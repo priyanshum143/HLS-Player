@@ -4,7 +4,6 @@ This class contains all the models / dataclasses required for HLS player
 
 import numpy as np
 from dataclasses import dataclass
-from datetime import datetime
 
 @dataclass
 class Rendition:
