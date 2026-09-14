@@ -17,6 +17,7 @@ from src.hls_player.utils.date_time_utils import convert_float_timestamp_to_IST
 
 logger = get_logger(__name__)
 msn_skip_logger = get_logger("msn_skip")
+msn_logs = get_logger("msn_logs")
 
 
 class PlaylistParser:
@@ -131,6 +132,7 @@ class PlaylistParser:
 
             logger.debug("Fetching the media playlist.")
             media_playlist = self._fetch_m3u8_with_retry(m3u8_url)
+            msn_logs.debug(media_playlist)
             sleep_time = getattr(media_playlist, 'target_duration', 0) / 2
 
             base_sequence = getattr(media_playlist, 'media_sequence', 0)
