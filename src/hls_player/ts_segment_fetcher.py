@@ -1,5 +1,5 @@
 """
-This file contains the code to download the segments, store them in a byte
+This file contains the code to download the ts segments and to store them in a byte
 """
 
 import queue
@@ -15,9 +15,9 @@ from src.hls_player.utils.loggers import get_logger
 logger = get_logger(__name__)
 
 
-class Fetcher:
+class TsSegmentsFetcher:
     """
-    This class contains the code to download the segments, store them in a byte
+    This class contains the code to download the ts segments and to store them in a byte
     """
 
     def __init__(self, media_playlist_url: str) -> None:
@@ -67,10 +67,10 @@ class Fetcher:
 
     def push_downloaded_segment_in_que(self, segment_que: queue.Queue) -> None:
         """
-        This method will keep downloading the segments present in PlaylistFetcher.segment_queue
+        This method will keep downloading the ts segments present in PlaylistParser.seg_que
         and will push the downloaded segment in the decoded_queue
 
-        :param segment_que: PlaylistFetcher.segment_queue
+        :param segment_que: PlaylistParser.seg_que
         :return: None
         """
 

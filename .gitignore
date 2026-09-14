@@ -1,0 +1,18 @@
+# Python and uv generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.python-version
+.idea/
+
+# Virtual environments
+.venv
+
+# Logs
+logs/
+
+# uv.lock
+uv.lock

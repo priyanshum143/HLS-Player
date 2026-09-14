@@ -18,14 +18,14 @@ from src.hls_player.utils.date_time_utils import convert_float_timestamp_to_IST
 logger = get_logger(__name__)
 
 
-class PlaylistFetcher:
+class PlaylistParser:
     """
-    This class is used to fetch playlist and push the segments into queue
+    This class is used to fetch and parser playlist and push the segments into queue
     """
 
     def __init__(self, master_playlist_url: str) -> None:
         """
-        This is constructor for PlaylistFetcher
+        This is constructor for PlaylistParser
 
         :param master_playlist_url: master playlist url
         """
@@ -36,7 +36,8 @@ class PlaylistFetcher:
     @staticmethod
     def fetch_m3u8_playlist(m3u8_url: str) -> m3u8.M3U8:
         """
-        This method will load the m3u8 URL as m3u8 playlist and will return the same.
+        This method will load the m3u8 URL as m3u8 playlist and will return the same
+        with error handling.
 
         :param m3u8_url: m3u8 url to fetch
         :return: m3u8 Playlist
@@ -107,7 +108,7 @@ class PlaylistFetcher:
 
     def push_media_playlist_segments(self, m3u8_url: str, duration: int = None) -> None:
         """
-        This method is to keep capturing the media playlist segments
+        This method is to keep capturing the media playlist segments and pushing them in a queue
 
         :param m3u8_url: m3u8 url
         :param duration: duration in seconds, if none then it will capture forever
