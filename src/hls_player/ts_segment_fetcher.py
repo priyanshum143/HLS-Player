@@ -28,7 +28,7 @@ class TsSegmentsFetcher:
         """
 
         self.media_playlist_url = media_playlist_url
-        self.decoded_queue = queue.Queue()
+        self.downloaded_segment_que = queue.Queue()
         self.request_client = requests.Session()
 
     def download_segments(self, segment: Segment) -> bytes:
@@ -78,6 +78,7 @@ class TsSegmentsFetcher:
         while True:
             segment = segment_que.get()
             if segment is None:
+                self.downloaded_segment_que.put(None)
                 logger.info("All the segments have been downloaded.")
                 break
             logger.debug(f"Got the segment: {segment} from segments queue.")
@@ -85,4 +86,4 @@ class TsSegmentsFetcher:
             downloaded_seg = self.generate_downloaded_segment(segment)
             logger.debug(f"Made the downloaded segment: {downloaded_seg}")
 
-            self.decoded_queue.put(downloaded_seg)
+            self.downloaded_segment_que.put(downloaded_seg)

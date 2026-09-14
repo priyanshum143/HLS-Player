@@ -7,11 +7,13 @@ import threading
 from src.hls_player import Configs
 from src.hls_player.playlist_parser import PlaylistParser
 from src.hls_player.ts_segment_fetcher import TsSegmentsFetcher
+from src.hls_player.decode_bytes import DecodeBytes
 from src.hls_player.utils.string_utils import resolve_url
 from src.hls_player.utils.loggers import get_logger
 
 master_playlist_url = Configs.MASTER_PLAYLIST_URL
 playlist_fetcher = PlaylistParser(master_playlist_url)
+decode_bytes = DecodeBytes()
 
 logger = get_logger(__name__)
 
@@ -50,13 +52,23 @@ def main():
         args=(playlist_fetcher.seg_que,)
     )
 
+    # Creating a thread to decode the ts segment bytes
+    decode_bytes_thread = threading.Thread(
+        target=decode_bytes.generate_audio_and_video_queue,
+        args=(ts_segment_fetcher.downloaded_segment_que,)
+    )
+
     # Starting the thread to fetch the media playlist
     logger.info(f"Starting to fetch the media playlist for variant: {complete_media_playlist_url}")
     playlist_thread.start()
 
-    # Starting the threads to download the TS segments present in media playlist
+    # Starting the thread to download the TS segments present in media playlist
     logger.info("Starting to download the TS segments.")
     ts_segment_thread.start()
+
+    # Starting the thread to decode the downloaded TS segments Bytes
+    logger.info("Starting the decode bytes thread.")
+    decode_bytes_thread.start()
 
     # Finishing the thread which was fetching the media playlist
     try:
@@ -66,6 +78,9 @@ def main():
 
     # Finishing the thread which was downloading the TS segments
     ts_segment_thread.join()
+
+    # Finishing the thread which was decoding the TS segments bytes.
+    decode_bytes_thread.join()
 
 if __name__ == "__main__":
     main()
