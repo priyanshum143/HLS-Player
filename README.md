@@ -134,6 +134,5 @@ No license required — clone or fork the repo and enjoy.
 **Priyanshu** — CSE 2025 Graduate | Software Engineer at Amagi Media Labs
 
 - LinkedIn: [Priyanshu Mehta](https://www.linkedin.com/in/priyanshu-mehta)
-- Project Repository: 
 
 Feel free to reach out for collaborations or if you encounter any issues!
