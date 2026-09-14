@@ -100,7 +100,7 @@ class PlaylistParser:
                 Rendition(
                     uri=rendition.uri,
                     bandwidth=rendition.stream_info.bandwidth,
-                    resolution=f"{rendition.stream_info.resolution[0]}x{rendition.stream_info.resolution[1]}",
+                    resolution=f"{rendition.stream_info.resolution[0]}x{rendition.stream_info.resolution[1]}" if rendition.stream_info.resolution else "1280x720",
                     codecs=rendition.stream_info.codecs,
                 )
             )
