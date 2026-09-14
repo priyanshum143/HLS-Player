@@ -67,7 +67,7 @@ def main():
     ts_segment_thread.start()
 
     # Starting the thread to decode the downloaded TS segments Bytes
-    logger.info("Starting the decode bytes thread.")
+    logger.info("Starting to decode the TS segment bytes.")
     decode_bytes_thread.start()
 
     # Finishing the thread which was fetching the media playlist

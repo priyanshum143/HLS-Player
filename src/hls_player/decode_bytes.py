@@ -51,7 +51,7 @@ class DecodeBytes:
         :return: None
         """
 
-        if frame.stream.type == 'video':
+        if isinstance(frame, av.VideoFrame):
             rgb_array = frame.to_ndarray(format='rgb24')
             pts = float(frame.pts * frame.time_base)
             video_packet = VideoPacket(
@@ -60,7 +60,8 @@ class DecodeBytes:
             )
             self.video_queue.put(video_packet)
 
-        elif frame.stream.type == 'audio':
+
+        elif isinstance(frame, av.AudioFrame):
             pcm = frame.to_ndarray()
             pts = float(frame.pts * frame.time_base)
             audio_packet = AudioPacket(
