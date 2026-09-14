@@ -27,7 +27,8 @@ def main():
     """
 
     # The duration for which we need to run our player
-    duration = Configs.DEFAULT_PLAYER_DURATION
+    # duration = Configs.DEFAULT_PLAYER_DURATION
+    duration = None
 
     # Fetching the renditions from master playlist
     logger.info(f"Fetching the master playlist for {master_playlist_url} to extract the renditions.")
