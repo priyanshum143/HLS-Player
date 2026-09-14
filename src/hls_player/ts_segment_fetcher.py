@@ -93,6 +93,6 @@ class TsSegmentsFetcher:
             downloaded_seg = self.generate_downloaded_segment(segment)
             if not downloaded_seg:
                 continue
-            logger.debug(f"Made the downloaded segment: {downloaded_seg}")
+            logger.debug(f"Made the downloaded segment: {downloaded_seg.sequence}")
 
             self.downloaded_segment_que.put(downloaded_seg)
