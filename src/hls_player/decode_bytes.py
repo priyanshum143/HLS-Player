@@ -7,6 +7,8 @@ import io
 import queue
 from typing import Any
 
+import numpy as np
+
 from src.hls_player.models.models import (
     VideoPacket,
     AudioPacket,
@@ -63,6 +65,9 @@ class DecodeBytes:
 
         elif isinstance(frame, av.AudioFrame):
             pcm = frame.to_ndarray()
+            if pcm.dtype != np.float32:
+                max_val = float(np.iinfo(pcm.dtype).max) if np.issubdtype(pcm.dtype, np.integer) else 1.0
+                pcm = pcm.astype(np.float32) / max_val
             pts = float(frame.pts * frame.time_base)
             audio_packet = AudioPacket(
                 pcm=pcm,
@@ -79,13 +84,13 @@ class DecodeBytes:
         :return: None
         """
 
-        logger.info("Starting to decode the downloaded segments (Bytes).")
+        logger.debug("Starting to decode the downloaded segments (Bytes).")
         while True:
             downloaded_seg = downloaded_seg_que.get()
             if downloaded_seg is None:
                 self.video_queue.put(None)
                 self.audio_queue.put(None)
-                logger.info("All the downloaded segments has been decoded.")
+                logger.debug("All the downloaded segments has been decoded.")
                 return
 
             seg_container = None
@@ -96,7 +101,7 @@ class DecodeBytes:
                         continue
                     for frame in packet.decode():
                         self.generate_audio_and_video_packet_from_a_frame(frame)
-            except av.AVError as e:
+            except av.FFmpegError as e:
                 logger.error(f"Failed to decode segment {downloaded_seg.sequence}: {e}, skipping.")
             finally:
                 if seg_container:

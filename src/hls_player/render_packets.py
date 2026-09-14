@@ -40,39 +40,54 @@ class RenderPackets:
 
     def audio_loop(self, audio_queue: queue.Queue) -> None:
         """
-        This method consumes AudioPackets, feeds PCM to sounddevice, and sets the master clock
-        on the first packet.
+        This method consumes AudioPackets, feeds PCM to a single continuous OutputStream,
+        and sets the master clock on the first packet.
 
         :param audio_queue: queue of audio packets
         :return: None
         """
 
-        logger.info("Audio render loop started.")
+        logger.debug("Audio render loop started.")
+        stream: sounddevice.OutputStream | None = None
+
         while True:
             audio_packet: AudioPacket = audio_queue.get()
             if audio_packet is None:
+                if stream is not None:
+                    stream.stop()
+                    stream.close()
                 with self.stream_start_lock:
                     if self.stream_start is None:
                         self.stream_start = time.time()
                         self.stream_started_event.set()
-                logger.info("Audio render loop finished.")
+                logger.debug("Audio render loop finished.")
                 return
 
             # sounddevice expects (samples, channels), PyAV gives (channels, samples)
             pcm = np.ascontiguousarray(audio_packet.pcm.T, dtype=np.float32)
+            channels = pcm.shape[1] if pcm.ndim > 1 else 1
 
-            # Set stream_start once using the first audio packet's pts
-            with self.stream_start_lock:
-                if self.stream_start is None:
-                    self.stream_start = time.time() - audio_packet.pts
-                    self.stream_started_event.set()
-                    logger.debug(f"Stream start set to {self.stream_start} from audio pts {audio_packet.pts}")
+            # Open one OutputStream for the whole session — avoids gaps between frames
+            if stream is None:
+                stream = sounddevice.OutputStream(
+                    samplerate=audio_packet.sample_rate,
+                    channels=channels,
+                    dtype='float32',
+                )
+                stream.start()
+
+                with self.stream_start_lock:
+                    if self.stream_start is None:
+                        self.stream_start = time.time() - audio_packet.pts
+                        self.stream_started_event.set()
+                        logger.debug(f"Stream start set to {self.stream_start} from audio pts {audio_packet.pts}")
 
             if self.stop_event.is_set():
+                stream.stop()
+                stream.close()
                 return
 
-            sounddevice.play(pcm, samplerate=audio_packet.sample_rate)
-            sounddevice.wait()
+            stream.write(pcm)
 
     def video_loop(self, video_queue: queue.Queue) -> None:
         """
@@ -83,7 +98,7 @@ class RenderPackets:
         :return: None
         """
 
-        logger.info("Video render loop started.")
+        logger.debug("Video render loop started.")
 
         # Wait until audio thread has set stream_start before attempting any sync
         self.stream_started_event.wait()
@@ -91,7 +106,7 @@ class RenderPackets:
         while True:
             video_packet: VideoPacket = video_queue.get()
             if video_packet is None:
-                logger.info("Video render loop finished.")
+                logger.debug("Video render loop finished.")
                 return
 
             with self.stream_start_lock:
@@ -138,7 +153,6 @@ class RenderPackets:
                 if event.type == pygame.QUIT:
                     logger.info("User closed the window.")
                     self.stop_event.set()
-                    sounddevice.stop()
                     pygame.quit()
                     return
             pygame.time.wait(10)
